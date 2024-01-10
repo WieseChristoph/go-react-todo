@@ -1,0 +1,52 @@
+version: "3.3"
+services:
+  proxy:
+    image: nginx:alpine
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - backend
+  frontend:
+    build:
+      context: .
+      dockerfile: Node-PNPM.Dockerfile
+    volumes:
+      - ./../frontend:/app
+    depends_on:
+      - backend
+    working_dir: /app
+    command: sh -c "pnpm install && pnpm run dev --host"
+  backend:
+    image: cosmtrek/air:latest
+    volumes:
+      - ./../backend:/app
+    environment:
+      - DB_DRIVER=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=todo
+      - DB_SSL_MODE=disable
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    working_dir: /app
+  db:
+    image: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: todo
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
